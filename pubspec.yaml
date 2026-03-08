@@ -1,0 +1,37 @@
+name: memo_copypaste
+description: "메모복붙 - 자주쓰는문구 한곳에 손쉽게 관리/복사"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  provider: ^6.1.2
+  sqflite: ^2.4.2
+  path_provider: ^2.1.5
+  path: ^1.9.1
+  uuid: ^4.5.1
+  flutter_slidable: ^4.0.0
+  share_plus: ^11.0.0
+  image_picker: ^1.1.2
+  file_picker: ^9.2.1
+  intl: ^0.20.2
+  url_launcher: ^6.3.1
+  shared_preferences: ^2.5.2
+  firebase_core: ^3.12.1
+  firebase_auth: ^5.6.1
+  cloud_firestore: ^5.6.5
+  flutter_staggered_grid_view: ^0.7.0
+  reorderables: ^0.6.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

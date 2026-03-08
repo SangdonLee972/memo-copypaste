@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">메모복붙</string>
+    <string name="widget_description">자주 쓰는 문구를 빠르게 복사</string>
+    <string name="keyboard_name">메모복붙 키보드</string>
+</resources>
