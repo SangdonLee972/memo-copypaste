@@ -16,19 +16,28 @@ class DatabaseService {
     return _database!;
   }
 
+  /// iOS: App Group 경로에 DB를 직접 저장하여 키보드 확장과 공유
+  Future<String> _getDBPath() async {
+    if (Platform.isIOS) {
+      try {
+        final groupPath = await _dbSharingChannel.invokeMethod<String>('getDBPath');
+        if (groupPath != null && groupPath.isNotEmpty) {
+          return groupPath;
+        }
+      } catch (_) {}
+    }
+    // 기본 경로 (Android 또는 iOS fallback)
+    final dbPath = await getDatabasesPath();
+    return join(dbPath, 'memo_copypaste.db');
+  }
+
   /// iOS 위젯/키보드 확장이 DB에 접근할 수 있도록 App Group 컨테이너에 DB 복사
   Future<void> _syncToAppGroup() async {
-    if (!Platform.isIOS) return;
-    try {
-      await _dbSharingChannel.invokeMethod('copyDBToAppGroup');
-    } catch (_) {
-      // App Group 미설정 시 무시
-    }
+    // App Group 경로에 직접 저장하므로 별도 복사 불필요
   }
 
   Future<Database> _initDB() async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, 'memo_copypaste.db');
+    final path = await _getDBPath();
 
     return await openDatabase(
       path,
