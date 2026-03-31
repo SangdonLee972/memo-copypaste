@@ -90,19 +90,23 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
               child: ReorderableListView.builder(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
                 itemCount: snippets.length,
+                buildDefaultDragHandles: false,
                 onReorder: (oldIndex, newIndex) {
                   provider.reorderSnippets(oldIndex, newIndex);
                 },
                 itemBuilder: (context, index) {
                   final snippet = snippets[index];
-                  return Padding(
+                  return ReorderableDragStartListener(
                     key: ValueKey(snippet.id),
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: SnippetTile(
-                      snippet: snippet,
-                      showDragHandle: true,
-                      onTap: () {},
-                      onCopy: () {},
+                    index: index,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: SnippetTile(
+                        snippet: snippet,
+                        showDragHandle: true,
+                        onTap: () {},
+                        onCopy: () {},
+                      ),
                     ),
                   );
                 },
