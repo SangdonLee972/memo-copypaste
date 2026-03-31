@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -11,9 +12,9 @@ import 'snippet_edit_screen.dart';
 
 /// 카테고리 상세: 해당 카테고리의 스니펫 목록
 /// - 일반 모드: 복사만 가능
-/// - 길게 누르기: 순서변경 모드 (드래그로 위치 이동)
+/// - 길게 누르기: 순서변경 모드 (iOS 홈화면 스타일 흔들림 + 드래그)
 /// - 수정 버튼: 수정 모드 (스니펫 탭 → 편집)
-/// - 빈 공간 탭: 모드 해제
+/// - 빈 공간 탭 / 완료 버튼: 모드 해제
 class CategoryDetailScreen extends StatefulWidget {
   final Category category;
 
@@ -55,10 +56,9 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
         ),
         actions: [
           if (_mode == _ScreenMode.reorder)
-            IconButton(
-              icon: const Icon(Icons.check),
+            TextButton(
               onPressed: _exitMode,
-              tooltip: '완료',
+              child: const Text('완료', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
             )
           else if (_mode == _ScreenMode.edit)
             IconButton(
@@ -82,7 +82,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
             return _buildEmptyState(context);
           }
 
-          // 순서변경 모드: ReorderableListView
+          // 순서변경 모드: iOS 홈화면 스타일
           if (_mode == _ScreenMode.reorder) {
             return GestureDetector(
               behavior: HitTestBehavior.translucent,
@@ -91,7 +91,29 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
                 itemCount: snippets.length,
                 buildDefaultDragHandles: false,
+                proxyDecorator: (child, index, animation) {
+                  return AnimatedBuilder(
+                    animation: animation,
+                    builder: (context, child) {
+                      final scale = Tween<double>(begin: 1.0, end: 1.04).animate(
+                        CurvedAnimation(parent: animation, curve: Curves.easeInOut),
+                      );
+                      return Transform.scale(
+                        scale: scale.value,
+                        child: Material(
+                          color: Colors.transparent,
+                          elevation: 8,
+                          shadowColor: Colors.black26,
+                          borderRadius: BorderRadius.circular(14),
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: child,
+                  );
+                },
                 onReorder: (oldIndex, newIndex) {
+                  HapticFeedback.lightImpact();
                   provider.reorderSnippets(oldIndex, newIndex);
                 },
                 itemBuilder: (context, index) {
@@ -99,13 +121,38 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                   return ReorderableDragStartListener(
                     key: ValueKey(snippet.id),
                     index: index,
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: SnippetTile(
-                        snippet: snippet,
-                        showDragHandle: true,
-                        onTap: () {},
-                        onCopy: () {},
+                    child: _JiggleWrapper(
+                      index: index,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            SnippetTile(
+                              snippet: snippet,
+                              showDragHandle: true,
+                              onTap: () {},
+                              onCopy: () {},
+                            ),
+                            // 삭제 버튼 (iOS 스타일 마이너스 뱃지)
+                            Positioned(
+                              top: -6,
+                              left: -6,
+                              child: GestureDetector(
+                                onTap: () => _confirmDelete(context, provider, snippet),
+                                child: Container(
+                                  width: 22,
+                                  height: 22,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.remove, size: 14, color: Colors.white),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   );
@@ -125,7 +172,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                 final snippet = snippets[index];
                 return GestureDetector(
                   onLongPress: () {
-                    HapticFeedback.mediumImpact();
+                    HapticFeedback.heavyImpact();
                     setState(() => _mode = _ScreenMode.reorder);
                   },
                   child: Padding(
@@ -262,6 +309,67 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// iOS 홈화면 스타일 흔들림(jiggle) 애니메이션 위젯
+class _JiggleWrapper extends StatefulWidget {
+  final Widget child;
+  final int index;
+
+  const _JiggleWrapper({required this.child, required this.index});
+
+  @override
+  State<_JiggleWrapper> createState() => _JiggleWrapperState();
+}
+
+class _JiggleWrapperState extends State<_JiggleWrapper>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _rotation;
+  late final double _baseAngle;
+  late final Duration _delay;
+
+  @override
+  void initState() {
+    super.initState();
+    // 각 아이템마다 약간 다른 흔들림으로 자연스러움 연출
+    final random = Random(widget.index);
+    _baseAngle = 0.008 + random.nextDouble() * 0.008; // 0.008 ~ 0.016 rad
+    _delay = Duration(milliseconds: random.nextInt(200));
+
+    _controller = AnimationController(
+      duration: Duration(milliseconds: 150 + random.nextInt(100)),
+      vsync: this,
+    );
+
+    _rotation = Tween<double>(begin: -_baseAngle, end: _baseAngle).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+
+    Future.delayed(_delay, () {
+      if (mounted) _controller.repeat(reverse: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _rotation,
+      builder: (context, child) {
+        return Transform.rotate(
+          angle: _rotation.value,
+          child: child,
+        );
+      },
+      child: widget.child,
     );
   }
 }
