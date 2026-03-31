@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:reorderables/reorderables.dart';
 import '../providers/app_provider.dart';
 import '../models/category.dart' as cat;
 import '../utils/app_theme.dart';
@@ -10,7 +12,13 @@ import 'clipboard_history_screen.dart';
 import '../widgets/category_card.dart';
 import '../widgets/add_category_dialog.dart';
 
-/// 홈 화면: 카테고리 그리드 (실제 메모복붙 앱과 동일 구조)
+enum _HomeMode { normal, reorder, edit }
+
+/// 홈 화면: 카테고리 그리드
+/// - 일반 모드: 탭하면 카테고리 진입
+/// - 길게 누르기: 순서변경 모드 (드래그로 위치 이동)
+/// - 수정 버튼: 수정 모드 (탭하면 카테고리 편집)
+/// - 빈 공간 탭: 모드 해제
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -19,7 +27,13 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  bool _isEditMode = false;
+  _HomeMode _mode = _HomeMode.normal;
+
+  void _exitMode() {
+    if (_mode != _HomeMode.normal) {
+      setState(() => _mode = _HomeMode.normal);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,98 +41,159 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('메모복붙'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.history),
-            tooltip: '클립보드 히스토리',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ClipboardHistoryScreen()),
+          if (_mode == _HomeMode.normal) ...[
+            IconButton(
+              icon: const Icon(Icons.history),
+              tooltip: '클립보드 히스토리',
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ClipboardHistoryScreen()),
+              ),
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SearchScreen()),
+            IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SearchScreen()),
+              ),
             ),
-          ),
-          IconButton(
-            icon: Icon(_isEditMode ? Icons.check : Icons.edit_outlined),
-            onPressed: () => setState(() => _isEditMode = !_isEditMode),
-            tooltip: _isEditMode ? '완료' : '편집',
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: () => setState(() => _mode = _HomeMode.edit),
+              tooltip: '수정',
             ),
+            IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              ),
+            ),
+          ] else
+            IconButton(
+              icon: const Icon(Icons.check),
+              onPressed: _exitMode,
+              tooltip: '완료',
+            ),
+        ],
+      ),
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: _exitMode,
+        child: Consumer<AppProvider>(
+          builder: (context, provider, _) {
+            if (provider.isLoading) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final categories = provider.categories;
+
+            if (_mode == _HomeMode.reorder) {
+              return _buildReorderMode(provider, categories);
+            }
+
+            return _buildNormalOrEditMode(provider, categories);
+          },
+        ),
+      ),
+    );
+  }
+
+  /// 순서변경 모드: ReorderableWrap으로 드래그 이동
+  Widget _buildReorderMode(AppProvider provider, List<cat.Category> categories) {
+    final width = (MediaQuery.of(context).size.width - 16 * 2 - 12) / 2;
+    final height = width / 1.5;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+      child: Column(
+        children: [
+          _buildSummaryHeader(provider),
+          const SizedBox(height: 8),
+          ReorderableWrap(
+            spacing: 12,
+            runSpacing: 12,
+            onReorder: (oldIndex, newIndex) {
+              provider.reorderCategories(oldIndex, newIndex);
+            },
+            children: categories.map((category) {
+              final count = provider.categoryCounts[category.id] ?? 0;
+              return SizedBox(
+                key: ValueKey(category.id),
+                width: width,
+                height: height,
+                child: CategoryCard(
+                  category: category,
+                  snippetCount: count,
+                  isEditMode: false,
+                  onTap: () {},
+                ),
+              );
+            }).toList(),
           ),
         ],
       ),
-      body: Consumer<AppProvider>(
-        builder: (context, provider, _) {
-          if (provider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
+    );
+  }
 
-          final categories = provider.categories;
-
-          return CustomScrollView(
-            slivers: [
-              // 상단 요약
-              SliverToBoxAdapter(
-                child: _buildSummaryHeader(provider),
-              ),
-              // 카테고리 그리드
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 1.5,
+  /// 일반 모드 & 수정 모드
+  Widget _buildNormalOrEditMode(AppProvider provider, List<cat.Category> categories) {
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: _buildSummaryHeader(provider),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 1.5,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                if (index == categories.length) {
+                  return _buildAddCategoryCard(context);
+                }
+                final category = categories[index];
+                final count = provider.categoryCounts[category.id] ?? 0;
+                return GestureDetector(
+                  onLongPress: () {
+                    HapticFeedback.mediumImpact();
+                    setState(() => _mode = _HomeMode.reorder);
+                  },
+                  child: CategoryCard(
+                    category: category,
+                    snippetCount: count,
+                    isEditMode: _mode == _HomeMode.edit,
+                    onTap: _mode == _HomeMode.edit
+                        ? () => _showEditCategoryDialog(context, category)
+                        : () {
+                            provider.loadSnippetsForCategory(category.id);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => CategoryDetailScreen(category: category),
+                              ),
+                            );
+                          },
+                    onEdit: () => _showEditCategoryDialog(context, category),
+                    onDelete: () => _confirmDelete(context, category),
                   ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      // 마지막은 "추가" 카드
-                      if (index == categories.length) {
-                        return _buildAddCategoryCard(context);
-                      }
-                      final category = categories[index];
-                      final count = provider.categoryCounts[category.id] ?? 0;
-                      return CategoryCard(
-                        category: category,
-                        snippetCount: count,
-                        isEditMode: _isEditMode,
-                        onTap: () {
-                          provider.loadSnippetsForCategory(category.id);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => CategoryDetailScreen(category: category),
-                            ),
-                          );
-                        },
-                        onEdit: () => _showEditCategoryDialog(context, category),
-                        onDelete: () => _confirmDelete(context, category),
-                      );
-                    },
-                    childCount: categories.length + 1,
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
+                );
+              },
+              childCount: categories.length + 1,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildSummaryHeader(AppProvider provider) {
     final totalSnippets = provider.allSnippets.length;
-    final totalCopies = provider.allSnippets.fold<int>(0, (sum, s) => sum + s.copyCount);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
@@ -132,9 +207,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(width: 12),
           _SummaryChip(
-            icon: Icons.copy,
-            label: '총 복사',
-            value: '$totalCopies',
+            icon: Icons.category,
+            label: '카테고리',
+            value: '${provider.categories.length}',
             color: AppTheme.copyGreen,
           ),
         ],

@@ -13,8 +13,10 @@ class SnippetTile extends StatelessWidget {
   final VoidCallback onCopy;
   final VoidCallback? onDelete;
   final VoidCallback? onTogglePin;
+  final VoidCallback? onLongPress;
   final bool showCategory;
   final bool showDragHandle;
+  final bool showEditIndicator;
   final String? highlightQuery;
 
   const SnippetTile({
@@ -24,14 +26,22 @@ class SnippetTile extends StatelessWidget {
     required this.onCopy,
     this.onDelete,
     this.onTogglePin,
+    this.onLongPress,
     this.showCategory = false,
     this.showDragHandle = false,
+    this.showEditIndicator = false,
     this.highlightQuery,
   });
 
   @override
   Widget build(BuildContext context) {
     final Widget tile = Card(
+      shape: showEditIndicator
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(color: AppTheme.primaryColor.withValues(alpha: 0.4), width: 1.5),
+            )
+          : null,
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: onTap,
@@ -122,16 +132,29 @@ class SnippetTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              // 원탭 복사 버튼 (핵심 UX)
-              _CopyButton(onCopy: onCopy),
+              // 수정 모드: 편집 아이콘 / 일반 모드: 복사 버튼
+              if (showEditIndicator)
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.edit, size: 19, color: AppTheme.primaryColor),
+                )
+              else
+                _CopyButton(onCopy: onCopy),
             ],
           ),
         ),
       ),
     );
 
+    Widget result = tile;
+
     if (onDelete != null || onTogglePin != null) {
-      return Slidable(
+      result = Slidable(
         endActionPane: ActionPane(
           motion: const BehindMotion(),
           extentRatio: onDelete != null && onTogglePin != null ? 0.4 : 0.2,
@@ -160,7 +183,7 @@ class SnippetTile extends StatelessWidget {
       );
     }
 
-    return tile;
+    return result;
   }
 
   Widget _buildTypeIcon() {

@@ -148,8 +148,8 @@ class AppProvider extends ChangeNotifier {
     // 클립보드 히스토리에 저장
     await addClipboardHistory(text, snippet.id);
 
-    // 복사 횟수 증가
-    final updated = snippet.copyWith(copyCount: snippet.copyCount + 1);
+    // 복사 횟수만 증가 (updatedAt은 변경하지 않아 순서 유지)
+    final updated = snippet.copyWith(copyCount: snippet.copyCount + 1, updatedAt: snippet.updatedAt);
     await _db.updateSnippet(updated);
 
     // 리스트 갱신

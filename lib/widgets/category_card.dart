@@ -25,7 +25,6 @@ class CategoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: isEditMode ? onEdit : onTap,
-      onLongPress: onEdit,
       child: Stack(
         children: [
           Container(

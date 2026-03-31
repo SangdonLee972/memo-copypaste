@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/category.dart';
 import '../models/snippet.dart';
@@ -8,7 +9,11 @@ import '../widgets/snippet_tile.dart';
 import '../widgets/variable_input_dialog.dart';
 import 'snippet_edit_screen.dart';
 
-/// 카테고리 상세: 해당 카테고리의 스니펫 목록 + 드래그 정렬
+/// 카테고리 상세: 해당 카테고리의 스니펫 목록
+/// - 일반 모드: 복사만 가능
+/// - 길게 누르기: 순서변경 모드 (드래그로 위치 이동)
+/// - 수정 버튼: 수정 모드 (스니펫 탭 → 편집)
+/// - 빈 공간 탭: 모드 해제
 class CategoryDetailScreen extends StatefulWidget {
   final Category category;
 
@@ -18,8 +23,16 @@ class CategoryDetailScreen extends StatefulWidget {
   State<CategoryDetailScreen> createState() => _CategoryDetailScreenState();
 }
 
+enum _ScreenMode { normal, reorder, edit }
+
 class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
-  bool _isReorderMode = false;
+  _ScreenMode _mode = _ScreenMode.normal;
+
+  void _exitMode() {
+    if (_mode != _ScreenMode.normal) {
+      setState(() => _mode = _ScreenMode.normal);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,11 +54,24 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: Icon(_isReorderMode ? Icons.check : Icons.swap_vert),
-            onPressed: () => setState(() => _isReorderMode = !_isReorderMode),
-            tooltip: _isReorderMode ? '완료' : '순서 변경',
-          ),
+          if (_mode == _ScreenMode.reorder)
+            IconButton(
+              icon: const Icon(Icons.check),
+              onPressed: _exitMode,
+              tooltip: '완료',
+            )
+          else if (_mode == _ScreenMode.edit)
+            IconButton(
+              icon: const Icon(Icons.check),
+              onPressed: _exitMode,
+              tooltip: '완료',
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: () => setState(() => _mode = _ScreenMode.edit),
+              tooltip: '수정',
+            ),
         ],
       ),
       body: Consumer<AppProvider>(
@@ -56,52 +82,74 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
             return _buildEmptyState(context);
           }
 
-          if (_isReorderMode) {
-            return ReorderableListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-              itemCount: snippets.length,
-              onReorder: (oldIndex, newIndex) {
-                provider.reorderSnippets(oldIndex, newIndex);
-              },
-              itemBuilder: (context, index) {
-                final snippet = snippets[index];
-                return Padding(
-                  key: ValueKey(snippet.id),
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: SnippetTile(
-                    snippet: snippet,
-                    showDragHandle: true,
-                    onTap: () {},
-                    onCopy: () {},
-                  ),
-                );
-              },
+          // 순서변경 모드: ReorderableListView
+          if (_mode == _ScreenMode.reorder) {
+            return GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: _exitMode,
+              child: ReorderableListView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                itemCount: snippets.length,
+                onReorder: (oldIndex, newIndex) {
+                  provider.reorderSnippets(oldIndex, newIndex);
+                },
+                itemBuilder: (context, index) {
+                  final snippet = snippets[index];
+                  return Padding(
+                    key: ValueKey(snippet.id),
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: SnippetTile(
+                      snippet: snippet,
+                      showDragHandle: true,
+                      onTap: () {},
+                      onCopy: () {},
+                    ),
+                  );
+                },
+              ),
             );
           }
 
-          return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-            itemCount: snippets.length,
-            itemBuilder: (context, index) {
-              final snippet = snippets[index];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: SnippetTile(
-                  snippet: snippet,
-                  onTap: () => _editSnippet(context, snippet),
-                  onCopy: () => _handleCopy(context, provider, snippet),
-                  onDelete: () => _confirmDelete(context, provider, snippet),
-                  onTogglePin: () => provider.togglePin(snippet),
-                ),
-              );
-            },
+          // 일반 모드 & 수정 모드
+          return GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: _exitMode,
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+              itemCount: snippets.length,
+              itemBuilder: (context, index) {
+                final snippet = snippets[index];
+                return GestureDetector(
+                  onLongPress: () {
+                    HapticFeedback.mediumImpact();
+                    setState(() => _mode = _ScreenMode.reorder);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: SnippetTile(
+                      snippet: snippet,
+                      onTap: _mode == _ScreenMode.edit
+                          ? () => _editSnippet(context, snippet)
+                          : () {},
+                      onCopy: () => _handleCopy(context, provider, snippet),
+                      onDelete: () => _confirmDelete(context, provider, snippet),
+                      onTogglePin: () => provider.togglePin(snippet),
+                      showEditIndicator: _mode == _ScreenMode.edit,
+                    ),
+                  ),
+                );
+              },
+            ),
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _createSnippet(context),
-        child: const Icon(Icons.add),
-      ),
+      // 순서변경 모드에서는 FAB 숨김
+      floatingActionButton: _mode == _ScreenMode.reorder
+          ? null
+          : FloatingActionButton(
+              onPressed: () => _createSnippet(context),
+              child: const Icon(Icons.add),
+            ),
     );
   }
 
@@ -157,7 +205,6 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
   /// 핵심 UX: 복사 시 변수 치환
   Future<void> _handleCopy(BuildContext context, AppProvider provider, Snippet snippet) async {
     if (snippet.hasUserVariables) {
-      // 사용자 입력이 필요한 변수가 있으면 다이얼로그
       final variables = await showVariableInputDialog(
         context,
         snippet.getUserVariables(),
@@ -168,7 +215,6 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
         _showCopiedFeedback(context);
       }
     } else {
-      // 변수 없거나 내장 변수만 → 즉시 복사
       await provider.copySnippet(snippet);
       if (context.mounted) _showCopiedFeedback(context);
     }
