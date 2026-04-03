@@ -197,7 +197,6 @@
 				F3AE0F1B5B8F2660D8C50CBD /* Pods-RunnerTests.release.xcconfig */,
 				F44FFBE1C7125474CAEEA5BF /* Pods-RunnerTests.profile.xcconfig */,
 			);
-			name = Pods;
 			path = Pods;
 			sourceTree = "<group>";
 		};
@@ -429,9 +428,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -562,6 +565,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEVELOPMENT_TEAM = K8Q58KBK87;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -745,6 +749,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEVELOPMENT_TEAM = K8Q58KBK87;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -768,6 +773,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEVELOPMENT_TEAM = K8Q58KBK87;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -789,6 +795,7 @@
 				CODE_SIGN_ENTITLEMENTS = MemoKeyboard/MemoKeyboard.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K8Q58KBK87;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MemoKeyboard/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = MemoKeyboard;
@@ -817,6 +824,7 @@
 				CODE_SIGN_ENTITLEMENTS = MemoKeyboard/MemoKeyboard.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K8Q58KBK87;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MemoKeyboard/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = MemoKeyboard;
@@ -843,6 +851,7 @@
 				CODE_SIGN_ENTITLEMENTS = MemoKeyboard/MemoKeyboard.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K8Q58KBK87;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MemoKeyboard/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = MemoKeyboard;

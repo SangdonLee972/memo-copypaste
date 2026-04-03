@@ -4,9 +4,11 @@ import '../models/snippet.dart';
 import '../models/category.dart';
 import '../services/database_service.dart';
 import '../services/clipboard_service.dart';
+import '../services/sync_service.dart';
 
 class AppProvider extends ChangeNotifier {
   final DatabaseService _db = DatabaseService();
+  final SyncService _sync = SyncService();
 
   final ClipboardService _clipboardService = ClipboardService();
 
@@ -48,6 +50,25 @@ class AppProvider extends ChangeNotifier {
     await loadTags();
     _isLoading = false;
     notifyListeners();
+    // 앱 시작 시 클라우드에서 다운로드 (로그인 상태일 때)
+    _syncFromCloud();
+  }
+
+  /// 클라우드 자동 동기화 (백그라운드, 실패해도 무시)
+  void _syncToCloud() {
+    if (!_sync.isSignedIn) return;
+    _sync.uploadAll().then((_) => _sync.updateSyncTimestamp()).catchError((_) {});
+  }
+
+  /// 클라우드에서 다운로드 후 로컬 갱신
+  void _syncFromCloud() {
+    if (!_sync.isSignedIn) return;
+    _sync.downloadAll().then((_) async {
+      await loadCategories();
+      await loadAllSnippets();
+      await _loadCategoryCounts();
+      await loadTags();
+    }).catchError((_) {});
   }
 
   // ===== Categories =====
@@ -58,14 +79,29 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> addCategory(Category category) async {
-    await _db.insertCategory(category);
+    // 새 카테고리는 맨 뒤에 추가 (최대 sortOrder + 1)
+    final maxSort = _categories.isEmpty
+        ? 0
+        : _categories.map((c) => c.sortOrder).reduce((a, b) => a > b ? a : b) + 1;
+    final newCategory = Category(
+      id: category.id,
+      name: category.name,
+      parentId: category.parentId,
+      colorValue: category.colorValue,
+      iconCodePoint: category.iconCodePoint,
+      sortOrder: maxSort,
+      createdAt: category.createdAt,
+    );
+    await _db.insertCategory(newCategory);
     await loadCategories();
     await _loadCategoryCounts();
+    _syncToCloud();
   }
 
   Future<void> updateCategory(Category category) async {
     await _db.updateCategory(category);
     await loadCategories();
+    _syncToCloud();
   }
 
   Future<void> deleteCategory(String id) async {
@@ -74,6 +110,7 @@ class AppProvider extends ChangeNotifier {
     await loadCategories();
     await loadAllSnippets();
     await _loadCategoryCounts();
+    _syncToCloud();
   }
 
   Future<void> reorderCategories(int oldIndex, int newIndex) async {
@@ -82,6 +119,13 @@ class AppProvider extends ChangeNotifier {
     _categories.insert(newIndex, item);
     notifyListeners();
     await _db.updateCategoryOrder(_categories);
+  }
+
+  /// 외부에서 categories 리스트를 직접 수정한 후 호출
+  Future<void> notifyAndSaveCategoryOrder() async {
+    notifyListeners();
+    await _db.updateCategoryOrder(_categories);
+    _syncToCloud();
   }
 
   // ===== Snippets =====
@@ -108,6 +152,7 @@ class AppProvider extends ChangeNotifier {
     await _loadCategoryCounts();
     await loadTags();
     notifyListeners();
+    _syncToCloud();
   }
 
   Future<void> updateSnippet(Snippet snippet) async {
@@ -118,6 +163,7 @@ class AppProvider extends ChangeNotifier {
     await loadAllSnippets();
     await loadTags();
     notifyListeners();
+    _syncToCloud();
   }
 
   Future<void> deleteSnippet(String id) async {
@@ -129,6 +175,7 @@ class AppProvider extends ChangeNotifier {
     await _loadCategoryCounts();
     await loadTags();
     notifyListeners();
+    _syncToCloud();
   }
 
   /// 핵심 기능: 스니펫 복사 (변수 치환 포함)
@@ -172,6 +219,7 @@ class AppProvider extends ChangeNotifier {
     _snippets.insert(newIndex, item);
     notifyListeners();
     await _db.updateSnippetOrder(_snippets);
+    _syncToCloud();
   }
 
   Future<void> moveSnippetToCategory(String snippetId, String categoryId) async {

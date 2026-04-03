@@ -16,6 +16,7 @@ class SnippetTile extends StatelessWidget {
   final VoidCallback? onLongPress;
   final bool showCategory;
   final bool showDragHandle;
+  final Widget? dragHandle;
   final bool showEditIndicator;
   final String? highlightQuery;
 
@@ -29,6 +30,7 @@ class SnippetTile extends StatelessWidget {
     this.onLongPress,
     this.showCategory = false,
     this.showDragHandle = false,
+    this.dragHandle,
     this.showEditIndicator = false,
     this.highlightQuery,
   });
@@ -45,12 +47,13 @@ class SnippetTile extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: onTap,
+        onLongPress: onLongPress,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
           child: Row(
             children: [
               if (showDragHandle) ...[
-                const Icon(Icons.drag_handle, size: 20, color: AppTheme.textSecondary),
+                dragHandle ?? const Icon(Icons.drag_handle, size: 20, color: AppTheme.textSecondary),
                 const SizedBox(width: 8),
               ],
               // 타입 아이콘
